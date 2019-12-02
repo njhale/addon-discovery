@@ -1,0 +1,7 @@
+domain: addons.k8s.io
+repo: github.com/njhale/addon-discovery
+resources:
+- group: discovery
+  kind: Addon
+  version: v1alpha1
+version: "2"
