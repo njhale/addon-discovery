@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/mitchellh/mapstructure v1.1.2
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
 	github.com/operator-framework/operator-lifecycle-manager v3.11.0+incompatible

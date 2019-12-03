@@ -61,7 +61,7 @@ var _ = Describe("Addon Reconciler", func() {
 
 		Context("with no components bearing its label", func() {
 			Specify("a status containing no component references", func() {
-				Consistently(func() ([]discoveryv1alpha1.Ref, error) {
+				Consistently(func() ([]discoveryv1alpha1.RichReference, error) {
 					err := mgrClient.Get(ctx, name, addon)
 					return addon.Status.Components.Refs, err
 				}, 4*interval, interval).Should(BeEmpty())
@@ -71,7 +71,7 @@ var _ = Describe("Addon Reconciler", func() {
 		Context("with components bearing its label", func() {
 			var (
 				objs         []runtime.Object
-				expectedRefs []discoveryv1alpha1.Ref
+				expectedRefs []discoveryv1alpha1.RichReference
 				namespace    string
 			)
 
@@ -96,7 +96,7 @@ var _ = Describe("Addon Reconciler", func() {
 			})
 
 			Specify("a status containing its component references", func() {
-				Eventually(func() ([]discoveryv1alpha1.Ref, error) {
+				Eventually(func() ([]discoveryv1alpha1.RichReference, error) {
 					err := mgrClient.Get(ctx, name, addon)
 					return addon.Status.Components.Refs, err
 				}, timeout, interval).Should(ConsistOf(expectedRefs))
@@ -132,7 +132,7 @@ var _ = Describe("Addon Reconciler", func() {
 				})
 
 				It("should add the component references", func() {
-					Eventually(func() ([]discoveryv1alpha1.Ref, error) {
+					Eventually(func() ([]discoveryv1alpha1.RichReference, error) {
 						err := mgrClient.Get(ctx, name, addon)
 						return addon.Status.Components.Refs, err
 					}, timeout, interval).Should(ConsistOf(expectedRefs))
@@ -147,7 +147,7 @@ var _ = Describe("Addon Reconciler", func() {
 				})
 
 				It("should remove the component references", func() {
-					Eventually(func() ([]discoveryv1alpha1.Ref, error) {
+					Eventually(func() ([]discoveryv1alpha1.RichReference, error) {
 						err := mgrClient.Get(ctx, name, addon)
 						return addon.Status.Components.Refs, err
 					}, timeout, interval).Should(BeEmpty())

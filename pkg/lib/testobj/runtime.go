@@ -5,6 +5,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/reference"
@@ -101,6 +102,16 @@ func GetReference(scheme *runtime.Scheme, obj runtime.Object) *corev1.ObjectRefe
 	}
 
 	return ref
+}
+
+// GetUnstructured gets an Unstructured for the given object and panics if it can't.
+func GetUnstructured(scheme *runtime.Scheme, obj runtime.Object) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	if err := scheme.Convert(obj, u, nil); err != nil {
+		panic(fmt.Errorf("error creating unstructured: %v", err))
+	}
+
+	return u
 }
 
 // WithItems sets the items of the list given and panics if it can't.

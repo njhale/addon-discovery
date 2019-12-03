@@ -30,19 +30,46 @@ type AddonStatus struct {
 	Components *Components `json:"components,omitempty"`
 }
 
+// ConditionType codifies a condition's type.
+type ConditionType string
+
+// Conditions represent the latest available observations of an object's state
+type Condition struct {
+	// Type of condition.
+	Type ConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status corev1.ConditionStatus `json:"status"`
+	// The reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+	// Last time the condition was probed
+	// +optional
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+}
+
 // Components tracks the resources that compose an addon.
 type Components struct {
 	// LabelSelector is a label query over a set of resources used to select the addon's components
 	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
-
 	// Refs are a set of references to the addon's component resources, selected with LabelSelector.
 	// +optional
-	Refs []Ref `json:"refs,omitempty"`
+	Refs []RichReference `json:"refs,omitempty"`
 }
 
-// Ref is a resource reference.
-type Ref struct {
+// RichReference is a reference to a resource, enriched with its status conditions.
+type RichReference struct {
 	*corev1.ObjectReference `json:",inline"`
+	// Conditions represents the latest state of the object.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // +kubebuilder:object:root=true

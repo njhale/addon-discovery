@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,6 +23,7 @@ const (
 	ComponentLabelKeyPrefix = "discovery.addons.k8s.io/"
 
 	newAddonError          = "Cannot create new Addon: %s"
+	newComponentError      = "Cannot create new Component: %s"
 	componentLabelKeyError = "Cannot generate component label key: %s"
 )
 
@@ -56,11 +59,11 @@ func NewAddon(addon *discoveryv1alpha1.Addon) (*Addon, error) {
 		return nil, fmt.Errorf(newAddonError, "nil Addon argument")
 	}
 
-	o := &Addon{
+	a := &Addon{
 		Addon: addon.DeepCopy(),
 	}
 
-	return o, nil
+	return a, nil
 }
 
 // ComponentLabelKey returns the addon's completed component label key
@@ -123,10 +126,10 @@ func (a *Addon) AddComponents(components ...runtime.Object) error {
 		return err
 	}
 
-	var refs []discoveryv1alpha1.Ref
-	for _, component := range components {
+	var refs []discoveryv1alpha1.RichReference
+	for _, obj := range components {
 		// Unpack nested components
-		if nested, err := meta.ExtractList(component); err == nil {
+		if nested, err := meta.ExtractList(obj); err == nil {
 			if err = a.AddComponents(nested...); err != nil {
 				return err
 			}
@@ -134,29 +137,21 @@ func (a *Addon) AddComponents(components ...runtime.Object) error {
 			continue
 		}
 
-		m, err := meta.Accessor(component)
+		component, err := NewComponent(obj)
 		if err != nil {
 			return err
 		}
+		if matches, err := component.Matches(selector); err != nil {
+			return err
+		} else if !matches {
+			return fmt.Errorf("Cannot add component %s/%s/%s to Addon %s: component labels not selected by %s", component.GetKind(), component.GetNamespace(), component.GetName(), a.GetName(), selector.String())
+		}
 
-		t, err := meta.TypeAccessor(component)
+		ref, err := component.Reference()
 		if err != nil {
 			return err
 		}
-
-		if !selector.Matches(labels.Set(m.GetLabels())) {
-			return fmt.Errorf("Cannot add component %s/%s/%s to Addon %s: component labels not selected by %s", t.GetKind(), m.GetNamespace(), m.GetName(), a.GetName(), selector.String())
-		}
-
-		ref, err := truncatedReference(component)
-		if err != nil {
-			return err
-		}
-
-		componentRef := discoveryv1alpha1.Ref{
-			ObjectReference: ref,
-		}
-		refs = append(refs, componentRef)
+		refs = append(refs, *ref)
 	}
 
 	if a.Status.Components == nil {
@@ -177,6 +172,60 @@ func (a *Addon) SetComponents(components ...runtime.Object) error {
 	}
 
 	return a.AddComponents(components...)
+}
+
+type Component struct {
+	*unstructured.Unstructured
+}
+
+// NewComponent returns a new Component instance.
+func NewComponent(component runtime.Object) (*Component, error) {
+	if component == nil {
+		return nil, fmt.Errorf(newComponentError, "nil Component argument")
+	}
+
+	u := &unstructured.Unstructured{}
+	if err := componentScheme.Convert(component, u, nil); err != nil {
+		return nil, err
+	}
+
+	c := &Component{
+		Unstructured: u,
+	}
+
+	return c, nil
+}
+
+func (c *Component) Matches(selector labels.Selector) (matches bool, err error) {
+	m, err := meta.Accessor(c)
+	if err != nil {
+		return
+	}
+	matches = selector.Matches(labels.Set(m.GetLabels()))
+
+	return
+}
+
+func (c *Component) Reference() (ref *discoveryv1alpha1.RichReference, err error) {
+	truncated, err := truncatedReference(c)
+	if err != nil {
+		return
+	}
+	ref = &discoveryv1alpha1.RichReference{
+		ObjectReference: truncated,
+	}
+
+	status, ok := c.UnstructuredContent()["Status"]
+	if !ok {
+		return
+	}
+	// conditions, ok := status["Conditions"]
+	// if !ok {
+	// 	return
+	// }
+	err = mapstructure.Decode(status, ref)
+
+	return
 }
 
 func truncatedReference(component runtime.Object) (ref *corev1.ObjectReference, err error) {

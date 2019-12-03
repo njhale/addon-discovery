@@ -173,6 +173,26 @@ var _ = Describe("Addon Decorator", func() {
 					Expect(err).ToNot(HaveOccurred())
 					Expect(addon.Status.Components.Refs).To(ConsistOf(toRefs(scheme, components...)))
 				})
+
+				PContext("with status conditions", func() {
+					BeforeEach(func() {
+						components = testobj.WithLabel(expectedKey, "",
+							testobj.WithName("mummy", &appsv1.Deployment{
+								Status: appsv1.DeploymentStatus{
+									Conditions: []appsv1.DeploymentCondition{
+										{
+											Type:   appsv1.DeploymentAvailable,
+											Status: corev1.ConditionTrue,
+										},
+									},
+								},
+							}),
+						)
+					})
+					Specify("projected status conditions", func() {
+
+					})
+				})
 			})
 
 			Context("not associated with the addon", func() {
@@ -226,9 +246,9 @@ func newAddon(name string) *Addon {
 	}
 }
 
-func toRefs(scheme *runtime.Scheme, objs ...runtime.Object) (refs []discoveryv1alpha1.Ref) {
+func toRefs(scheme *runtime.Scheme, objs ...runtime.Object) (refs []discoveryv1alpha1.RichReference) {
 	for _, ref := range testobj.GetReferences(scheme, objs...) {
-		componentRef := discoveryv1alpha1.Ref{
+		componentRef := discoveryv1alpha1.RichReference{
 			ObjectReference: &corev1.ObjectReference{
 				Kind:       ref.Kind,
 				APIVersion: ref.APIVersion,
