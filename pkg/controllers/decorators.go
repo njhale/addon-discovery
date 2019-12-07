@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -214,16 +213,6 @@ func (c *Component) Reference() (ref *discoveryv1alpha1.RichReference, err error
 	ref = &discoveryv1alpha1.RichReference{
 		ObjectReference: truncated,
 	}
-
-	status, ok := c.UnstructuredContent()["Status"]
-	if !ok {
-		return
-	}
-	// conditions, ok := status["Conditions"]
-	// if !ok {
-	// 	return
-	// }
-	err = mapstructure.Decode(status, ref)
 
 	return
 }

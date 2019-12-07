@@ -20,30 +20,22 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	kscheme "k8s.io/client-go/kubernetes/scheme"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	discoveryv1alpha1 "github.com/njhale/addon-discovery/pkg/api/v1alpha1"
+	"github.com/njhale/addon-discovery/pkg/lib/controller-runtime/source"
 )
 
 var (
 	localSchemeBuilder = runtime.NewSchemeBuilder(
-		kscheme.AddToScheme,
-		apiextensionsv1beta1.AddToScheme,
-		apiregistrationv1.AddToScheme,
 		discoveryv1alpha1.AddToScheme,
 	)
 	AddToScheme = localSchemeBuilder.AddToScheme
@@ -67,16 +59,7 @@ func SetManager(mgr ctrl.Manager, log logr.Logger) error {
 	// 	  sources on newly discovered types. This may require a threadsafe implementation of Scheme.
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&discoveryv1alpha1.Addon{}).
-		Watches(&source.Kind{Type: &appsv1.Deployment{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &corev1.Namespace{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &corev1.ServiceAccount{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &rbacv1.Role{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &rbacv1.RoleBinding{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRole{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &rbacv1.ClusterRoleBinding{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &apiextensionsv1beta1.CustomResourceDefinition{}}, enqueueAddon).
-		Watches(&source.Kind{Type: &apiregistrationv1.APIService{}}, enqueueAddon).
+		Watches(rec.source, enqueueAddon).
 		Complete(rec)
 }
 
@@ -88,9 +71,10 @@ type addonReconciler struct {
 	client.Client
 
 	log logr.Logger
-	mux sync.RWMutex
+	mu  sync.RWMutex
 	// addons contains the names of Addons the addonReconciler has observed exist.
 	addons map[types.NamespacedName]struct{}
+	source *source.Dynamic
 }
 
 func newAddonReconciler(cli client.Client, log logr.Logger) *addonReconciler {
@@ -99,6 +83,7 @@ func newAddonReconciler(cli client.Client, log logr.Logger) *addonReconciler {
 
 		log:    log,
 		addons: map[types.NamespacedName]struct{}{},
+		source: &source.Dynamic{},
 	}
 }
 
@@ -167,20 +152,15 @@ func (r *addonReconciler) updateComponents(ctx context.Context, addon *Addon) er
 func (r *addonReconciler) listComponents(ctx context.Context, selector labels.Selector) ([]runtime.Object, error) {
 	// Note: We need to figure out how to dynamically add new list types here (or some equivalent) in
 	// order to support addons composed of custom resources.
-	opt := client.MatchingLabelsSelector{Selector: selector}
-	componentLists := []runtime.Object{
-		&appsv1.DeploymentList{},
-		&corev1.NamespaceList{},
-		&corev1.ServiceAccountList{},
-		&corev1.SecretList{},
-		&rbacv1.RoleList{},
-		&rbacv1.RoleBindingList{},
-		&rbacv1.ClusterRoleList{},
-		&rbacv1.ClusterRoleBindingList{},
-		&apiextensionsv1beta1.CustomResourceDefinitionList{},
-		&apiregistrationv1.APIServiceList{},
+	var componentLists []runtime.Object
+	for _, gvk := range r.source.Active() {
+		gvk.Kind = gvk.Kind + "List"
+		ul := &unstructured.UnstructuredList{}
+		ul.SetGroupVersionKind(gvk)
+		componentLists = append(componentLists, ul)
 	}
 
+	opt := client.MatchingLabelsSelector{Selector: selector}
 	for _, list := range componentLists {
 		if err := r.List(ctx, list, opt); err != nil {
 			return nil, err
@@ -191,21 +171,21 @@ func (r *addonReconciler) listComponents(ctx context.Context, selector labels.Se
 }
 
 func (r *addonReconciler) observed(name types.NamespacedName) bool {
-	r.mux.RLock()
-	defer r.mux.RUnlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	_, ok := r.addons[name]
 	return ok
 }
 
 func (r *addonReconciler) observe(name types.NamespacedName) {
-	r.mux.Lock()
-	defer r.mux.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.addons[name] = struct{}{}
 }
 
 func (r *addonReconciler) unobserve(name types.NamespacedName) {
-	r.mux.Lock()
-	defer r.mux.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	delete(r.addons, name)
 }
 
