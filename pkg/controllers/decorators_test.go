@@ -18,7 +18,7 @@ import (
 	"github.com/njhale/addon-discovery/pkg/lib/testobj"
 )
 
-var _ = Describe("Addon Decorator", func() {
+var _ = PDescribe("Addon Decorator", func() {
 	DescribeTable("getting addon names from labels",
 		func(labels map[string]string, names []types.NamespacedName) {
 			Expect(AddonNames(labels)).To(ConsistOf(names))

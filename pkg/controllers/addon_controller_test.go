@@ -15,7 +15,7 @@ import (
 	"github.com/njhale/addon-discovery/pkg/lib/testobj"
 )
 
-var _ = Describe("Addon Reconciler", func() {
+var _ = PDescribe("Addon Reconciler", func() {
 	var (
 		ctx                            context.Context
 		addon                          *discoveryv1alpha1.Addon
