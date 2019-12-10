@@ -9,8 +9,8 @@ namespace: addon-discovery-system
 namePrefix: addon-discovery-
 
 # Labels to add to all resources and selectors.
-#commonLabels:
-#  someName: someValue
+commonLabels:
+  discovery.addons.k8s.io/addon-discovery: ""
 
 bases:
 - ../crd
