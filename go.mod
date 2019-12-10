@@ -7,7 +7,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
-	github.com/operator-framework/operator-lifecycle-manager v3.11.0+incompatible
+	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 	k8s.io/api v0.0.0-20191121015604-11707872ac1c
 	k8s.io/apiextensions-apiserver v0.0.0-20190918161926-8f644eb6e783
 	k8s.io/apimachinery v0.0.0-20191121015412-41065c7a8c2a

@@ -47,10 +47,10 @@ type Condition struct {
 	Message string `json:"message,omitempty"`
 	// Last time the condition was probed
 	// +optional
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
 	// Last time the condition transitioned from one status to another.
 	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 
 // Components tracks the resources that compose an addon.
