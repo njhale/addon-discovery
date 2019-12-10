@@ -102,6 +102,7 @@ func (r *addonReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if apierrors.IsNotFound(err) {
 			log.Info("Could not find Addon")
 			r.unobserve(req.NamespacedName)
+			// TODO(njhale): Recreate addon if we can find any components.
 		} else {
 			log.Error(err, "Error finding Addon")
 		}
@@ -196,10 +197,18 @@ func (r *addonReconciler) mapComponentRequests(obj handler.MapObject) (requests 
 
 	for _, name := range AddonNames(obj.Meta.GetLabels()) {
 		// Only enqueue if we can find the addon in our cache
-		if !r.observed(name) {
+		if r.observed(name) {
+			requests = append(requests, reconcile.Request{NamespacedName: name})
 			continue
 		}
-		requests = append(requests, reconcile.Request{NamespacedName: name})
+
+		// otherwise, best-effort generate a new addon
+		// TODO(njhale): Implement verification that the addon-discovery admission webhook accepted this label (JWT or maybe sign a set of fields?)
+		addon := &discoveryv1alpha1.Addon{}
+		addon.SetName(name.Name)
+		if err := r.Create(context.Background(), addon); err != nil && !apierrors.IsAlreadyExists(err) {
+			r.log.Error(err, "couldn't generate addon", "addon", name, "component", obj.Meta.GetSelfLink())
+		}
 	}
 
 	return
