@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mitchellh/mapstructure"
+	"github.com/yalp/jsonpath"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,18 +17,22 @@ import (
 	"k8s.io/client-go/tools/reference"
 
 	discoveryv1alpha1 "github.com/njhale/addon-discovery/pkg/api/v1alpha1"
+	"github.com/njhale/addon-discovery/pkg/lib/codec"
 )
 
 const (
 	// ComponentLabelKeyPrefix is the key prefix used for labels marking addon component resources.
 	ComponentLabelKeyPrefix = "discovery.addons.k8s.io/"
 
-	newAddonError          = "Cannot create new Addon: %s"
-	newComponentError      = "Cannot create new Component: %s"
-	componentLabelKeyError = "Cannot generate component label key: %s"
+	newAddonError               = "Cannot create new Addon: %s"
+	newComponentError           = "Cannot create new Component: %s"
+	componentLabelKeyError      = "Cannot generate component label key: %s"
+	componentConditionsJSONPath = "$.status.conditions"
 )
 
-var componentScheme = runtime.NewScheme()
+var (
+	componentScheme = runtime.NewScheme()
+)
 
 func init() {
 	utilruntime.Must(AddToScheme(componentScheme))
@@ -213,6 +219,23 @@ func (c *Component) Reference() (ref *discoveryv1alpha1.RichReference, err error
 	ref = &discoveryv1alpha1.RichReference{
 		ObjectReference: truncated,
 	}
+
+	out, _ := jsonpath.Read(c.UnstructuredContent(), componentConditionsJSONPath)
+	if out == nil {
+		return
+	}
+
+	var decoder *mapstructure.Decoder
+	decoder, err = mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Metadata:   nil,
+		DecodeHook: codec.MetaTimeHookFunc(),
+		Result:     &ref.Conditions,
+	})
+	if err != nil {
+		return
+	}
+
+	err = decoder.Decode(out)
 
 	return
 }
