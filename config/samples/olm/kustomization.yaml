@@ -1,0 +1,6 @@
+resources:
+- crds.yaml
+- olm.yaml
+
+commonLabels:
+  discovery.addons.k8s.io/olm: ""
