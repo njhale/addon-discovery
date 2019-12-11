@@ -52,11 +52,7 @@ func SetManager(mgr ctrl.Manager, log logr.Logger) error {
 		ToRequests: handler.ToRequestsFunc(rec.mapComponentRequests),
 	}
 
-	// Note: If we want to support resources composed of custom resources, we need to figure out how
-	// to dynamically add resource types to watch.
-	// Options:
-	// 1. Create a new source that watches discovery, dynamically adds unversioned types to a shared schema, and opens/closes
-	// 	  sources on newly discovered types. This may require a threadsafe implementation of Scheme.
+	// Add reconciler enqueued by dynamic Source watching all GVKs.
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&discoveryv1alpha1.Addon{}).
 		Watches(rec.source, enqueueAddon).
@@ -151,8 +147,6 @@ func (r *addonReconciler) updateComponents(ctx context.Context, addon *Addon) er
 }
 
 func (r *addonReconciler) listComponents(ctx context.Context, selector labels.Selector) ([]runtime.Object, error) {
-	// Note: We need to figure out how to dynamically add new list types here (or some equivalent) in
-	// order to support addons composed of custom resources.
 	var componentLists []runtime.Object
 	for _, gvk := range r.source.Active() {
 		gvk.Kind = gvk.Kind + "List"
